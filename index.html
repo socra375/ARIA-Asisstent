@@ -476,13 +476,6 @@
        1. CONFIGURACIÓN Y LINEAS DE DIÁLOGO (PERSONALIDAD Y CLIENT ID REAL)
        ========================================================================== */
     const ASSISTANT_NAME = "ARIA";
-    
-    /* 
-      NOTA DE CONFIGURACIÓN DE GOOGLE CLOUD CONSOLE:
-      Asegúrate de agregar en "Authorized JavaScript origins" de la pantalla de OAuth el dominio exacto
-      donde alojes tu página (ej. https://socra375.github.io).
-      Este mismo CLIENT_ID autentica tanto el acceso inicial como el de Google Calendar y Google Drive (Docs).
-    */
     const GOOGLE_CLIENT_ID = "156394619987-4r74e1oddmnmhg8nh9g8sjp855t1bnua.apps.googleusercontent.com";
 
     const DIALOGUE_LINES = {
@@ -554,7 +547,6 @@
 
       document.body.classList.add('app-active');
 
-      // Disparar mensaje de bienvenida hablado e impreso
       const bootMsg = DIALOGUE_LINES.boot[Math.floor(Math.random() * DIALOGUE_LINES.boot.length)];
       addChatMessage(ASSISTANT_NAME, bootMsg);
       speakText(bootMsg);
@@ -645,7 +637,7 @@
     }
 
     /* ==========================================================================
-       4. FUNCIONES DE CHAT Y COMANDOS (SOLUCIÓN BUG CRÍTICO + IA + REFUERZO)
+       4. FUNCIONES DE CHAT Y COMANDOS
        ========================================================================== */
     function addChatMessage(sender, text) {
       const history = document.getElementById('chat-history');
@@ -712,9 +704,9 @@
       }
 
       try {
-        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(promptToSend)}?model=openai&system=${encodeURIComponent(systemPrompt)}`);
+        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(promptToSend)}?model=openai-fast&system=${encodeURIComponent(systemPrompt)}`);
 
-        if (!response.ok) throw new Error("Fallo en la respuesta de la red neuronal.");
+        if (!response.ok) throw new Error(`Fallo en la respuesta de la red neuronal. Estado HTTP: ${response.status} ${response.statusText}`);
 
         const reply = await response.text();
         lastAriaResponse = reply;
@@ -777,7 +769,7 @@
     }
 
     /* ==========================================================================
-       6. MODOS DE ESTUDIO (FLASHCARDS CON REPETICIÓN ESPACIADA, QUIZ Y RESUMEN IA)
+       6. MODOS DE ESTUDIO
        ========================================================================== */
     let flashcards = JSON.parse(localStorage.getItem('aria_flashcards')) || [
       { q: "¿Qué es la complejidad O(1)?", a: "Tiempo de ejecución constante, independiente del tamaño de entrada.", dificil: false },
@@ -839,7 +831,6 @@
       if (mode === 'quiz') resetQuiz();
     }
 
-    // Quiz Mejorado con contador
     const sampleQuiz = [
       { q: "¿Qué estructura utiliza LIFO (Last In, First Out)?", opts: ["Cola (Queue)", "Pila (Stack)", "Árbol (Tree)"], correct: 1 },
       { q: "¿Qué protocolo opera en la capa de transporte?", opts: ["HTTP", "TCP", "IP"], correct: 1 },
@@ -887,7 +878,6 @@
       });
     }
 
-    // Resumen usando la IA real
     async function processSummary() {
       const txt = document.getElementById('summary-input').value.trim();
       if (!txt) return;
@@ -898,13 +888,14 @@
       const systemPrompt = `Eres ARIA. Resume el siguiente texto de forma clara, concisa y estructurada en puntos clave si aplica. Mantén un tono formal y servicial.`;
 
       try {
-        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(txt)}?model=openai&system=${encodeURIComponent(systemPrompt)}`);
-        if (!response.ok) throw new Error("Error procesando resumen.");
+        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(txt)}?model=openai-fast&system=${encodeURIComponent(systemPrompt)}`);
+        if (!response.ok) throw new Error(`Error procesando resumen. Estado HTTP: ${response.status} ${response.statusText}`);
 
         const summary = await response.text();
         addChatMessage(ASSISTANT_NAME, summary);
         speakText(summary);
       } catch (e) {
+        console.error("Error al generar el resumen:", e);
         addChatMessage(ASSISTANT_NAME, "Error al generar el resumen del texto.");
       } finally {
         document.getElementById('arc-reactor').classList.remove('listening');
