@@ -58,6 +58,68 @@
       opacity: 0.6;
     }
 
+    /* Pantalla Splash de Arranque / Login */
+    #splash-screen {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background-color: var(--bg-color);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+      padding: 20px;
+    }
+
+    .splash-logo {
+      width: 160px;
+      height: auto;
+      margin-bottom: 25px;
+      animation: pulse-arc 1.2s infinite alternate ease-in-out;
+      transition: width 0.5s ease, margin-bottom 0.5s ease;
+    }
+
+    .splash-logo.small {
+      width: 100px;
+      margin-bottom: 15px;
+    }
+
+    .boot-status {
+      font-size: 1.1rem;
+      color: var(--primary-cyan);
+      letter-spacing: 2px;
+      text-shadow: 0 0 8px var(--dim-cyan);
+      height: 30px;
+      text-align: center;
+    }
+
+    #login-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+
+    #login-container.visible {
+      opacity: 1;
+    }
+
+    /* Ocultar App Inicialmente */
+    header, main {
+      opacity: 0;
+      transition: opacity 0.8s ease;
+      pointer-events: none;
+    }
+
+    body.app-active header,
+    body.app-active main {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     /* Header y Paneles HUD */
     header {
       display: flex;
@@ -296,6 +358,17 @@
 </head>
 <body>
 
+  <!-- Pantalla Splash (Boot + Login) -->
+  <div id="splash-screen">
+    <img src="aria-logo.png" alt="ARIA Logo" class="splash-logo" id="splash-logo">
+    <div class="boot-status" id="boot-status">Inicializando núcleo ARIA...</div>
+    
+    <div id="login-container" class="hidden">
+      <p style="font-size: 0.95rem; color: var(--text-main); margin-bottom: 5px;">ACCESO RESTRINGIDO // AUTENTICACIÓN REQUERIDA</p>
+      <button id="btn-splash-login" onclick="triggerGoogleLogin()" style="padding: 14px 28px; font-size: 1.05rem;">INICIAR SESIÓN CON GOOGLE</button>
+    </div>
+  </div>
+
   <header>
     <div class="brand">ARIA // HUD v3.6</div>
     <div class="system-status">
@@ -309,7 +382,7 @@
     <!-- Panel Izquierdo: Estado e Integración Google -->
     <section class="hud-card">
       <h3 style="margin-bottom: 10px;">// MÓDULOS DE RED</h3>
-      <button id="btn-google-login" style="width: 100%; margin-bottom: 15px;">CONECTAR GOOGLE CLOUD</button>
+      <button id="btn-google-login" onclick="triggerGoogleLogin()" style="width: 100%; margin-bottom: 15px;">CONECTAR GOOGLE CLOUD</button>
       
       <div id="google-status" style="font-size: 0.85rem; margin-bottom: 15px;">Estado: Desconectado</div>
 
@@ -408,7 +481,7 @@
       NOTA DE CONFIGURACIÓN DE GOOGLE CLOUD CONSOLE:
       Asegúrate de agregar en "Authorized JavaScript origins" de la pantalla de OAuth el dominio exacto
       donde alojes tu página (ej. https://socra375.github.io).
-      Este mismo CLIENT_ID autentica tanto el acceso a Google Calendar como a Google Drive (Docs).
+      Este mismo CLIENT_ID autentica tanto el acceso inicial como el de Google Calendar y Google Drive (Docs).
     */
     const GOOGLE_CLIENT_ID = "156394619987-4r74e1oddmnmhg8nh9g8sjp855t1bnua.apps.googleusercontent.com";
 
@@ -436,7 +509,59 @@
     let googleAccessToken = null;
 
     /* ==========================================================================
-       2. RECONOCIMIENTO Y SÍNTESIS DE VOZ (WEB SPEECH API)
+       2. SECUENCIA DE ARRANQUE (BOOT SPLASH) Y TRANSICIÓN DE LOGIN
+       ========================================================================== */
+    const bootLines = [
+      "Inicializando núcleo ARIA...",
+      "Sincronizando sistemas...",
+      "Cargando módulos de aprendizaje...",
+      "Sistemas listos."
+    ];
+
+    function runBootSequence() {
+      const statusElement = document.getElementById('boot-status');
+      let index = 0;
+
+      const interval = setInterval(() => {
+        index++;
+        if (index < bootLines.length) {
+          statusElement.innerText = bootLines[index];
+        } else {
+          clearInterval(interval);
+          transitionToLogin();
+        }
+      }, 1200);
+    }
+
+    function transitionToLogin() {
+      const logo = document.getElementById('splash-logo');
+      const bootStatus = document.getElementById('boot-status');
+      const loginContainer = document.getElementById('login-container');
+
+      logo.classList.add('small');
+      bootStatus.style.display = 'none';
+
+      loginContainer.classList.remove('hidden');
+      setTimeout(() => {
+        loginContainer.classList.add('visible');
+      }, 50);
+    }
+
+    function unlockApp() {
+      const splash = document.getElementById('splash-screen');
+      splash.style.opacity = '0';
+      splash.style.visibility = 'hidden';
+
+      document.body.classList.add('app-active');
+
+      // Disparar mensaje de bienvenida hablado e impreso
+      const bootMsg = DIALOGUE_LINES.boot[Math.floor(Math.random() * DIALOGUE_LINES.boot.length)];
+      addChatMessage(ASSISTANT_NAME, bootMsg);
+      speakText(bootMsg);
+    }
+
+    /* ==========================================================================
+       3. RECONOCIMIENTO Y SÍNTESIS DE VOZ (WEB SPEECH API)
        ========================================================================== */
     const synth = window.speechSynthesis;
     let recognition = null;
@@ -520,7 +645,7 @@
     }
 
     /* ==========================================================================
-       3. FUNCIONES DE CHAT Y COMANDOS (SOLUCIÓN BUG CRÍTICO + IA + REFUERZO)
+       4. FUNCIONES DE CHAT Y COMANDOS (SOLUCIÓN BUG CRÍTICO + IA + REFUERZO)
        ========================================================================== */
     function addChatMessage(sender, text) {
       const history = document.getElementById('chat-history');
@@ -608,7 +733,7 @@
     }
 
     /* ==========================================================================
-       4. INFORMACIÓN DEL DISPOSITIVO
+       5. INFORMACIÓN DEL DISPOSITIVO
        ========================================================================== */
     function updateClock() {
       const now = new Date();
@@ -652,7 +777,7 @@
     }
 
     /* ==========================================================================
-       5. MODOS DE ESTUDIO (FLASHCARDS CON REPETICIÓN ESPACIADA, QUIZ Y RESUMEN IA)
+       6. MODOS DE ESTUDIO (FLASHCARDS CON REPETICIÓN ESPACIADA, QUIZ Y RESUMEN IA)
        ========================================================================== */
     let flashcards = JSON.parse(localStorage.getItem('aria_flashcards')) || [
       { q: "¿Qué es la complejidad O(1)?", a: "Tiempo de ejecución constante, independiente del tamaño de entrada.", dificil: false },
@@ -675,7 +800,6 @@
     function nextFlashcard() {
       if (flashcards.length === 0) return;
       
-      // Repetición espaciada simple: si hay tarjetas difíciles, tienen un 70% de probabilidad de salir primero
       const dificiles = flashcards.filter(f => f.dificil);
       if (dificiles.length > 0 && Math.random() < 0.7) {
         const randomDif = dificiles[Math.floor(Math.random() * dificiles.length)];
@@ -788,7 +912,7 @@
     }
 
     /* ==========================================================================
-       6. INTEGRACIÓN CON GOOGLE IDENTITY SERVICES (CALENDAR + DRIVE API)
+       7. INTEGRACIÓN CON GOOGLE IDENTITY SERVICES (CALENDAR + DRIVE API)
        ========================================================================== */
     let tokenClient;
 
@@ -805,19 +929,20 @@
             document.getElementById('btn-google-drive').disabled = false;
             fetchCalendarEvents(googleAccessToken);
             fetchDriveDocuments();
+            unlockApp();
           }
         },
       });
     }
 
-    document.getElementById('btn-google-login').onclick = () => {
+    function triggerGoogleLogin() {
       if (tokenClient) {
         tokenClient.requestAccessToken();
       } else {
         initGoogleClient();
         if (tokenClient) tokenClient.requestAccessToken();
       }
-    };
+    }
 
     async function fetchCalendarEvents(accessToken) {
       try {
@@ -873,10 +998,7 @@
        ========================================================================== */
     window.onload = () => {
       showFlashcard();
-      const bootMsg = DIALOGUE_LINES.boot[Math.floor(Math.random() * DIALOGUE_LINES.boot.length)];
-      addChatMessage(ASSISTANT_NAME, bootMsg);
-      speakText(bootMsg);
-      
+      runBootSequence();
       setTimeout(initGoogleClient, 1500);
     };
   </script>
