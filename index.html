@@ -231,18 +231,41 @@
       max-width: 85%;
       line-height: 1.4;
       font-size: 0.95rem;
+      position: relative;
     }
 
     .chat-msg.aria {
       align-self: flex-start;
       border-left: 3px solid var(--primary-cyan);
       background: rgba(0, 240, 255, 0.08);
+      padding-right: 35px; /* Espacio para el botón de copiar */
     }
 
     .chat-msg.user {
       align-self: flex-end;
       border-right: 3px solid #00ff88;
       background: rgba(0, 255, 136, 0.08);
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: transparent;
+      border: none;
+      color: var(--primary-cyan);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 2px 4px;
+      clip-path: none;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+
+    .copy-btn:hover {
+      opacity: 1;
+      background: rgba(0, 240, 255, 0.1);
+      box-shadow: none;
     }
 
     .chat-controls {
@@ -354,6 +377,55 @@
     .google-link:hover {
       text-decoration: underline;
     }
+
+    /* Comandos Avanzados Discretos */
+    .cmd-widget {
+      position: fixed;
+      bottom: 10px;
+      right: 15px;
+      z-index: 150;
+      font-size: 0.7rem;
+      color: var(--primary-cyan);
+      opacity: 0.35;
+      transition: opacity 0.3s ease;
+      cursor: pointer;
+      text-align: right;
+    }
+
+    .cmd-widget:hover {
+      opacity: 1;
+    }
+
+    .cmd-widget-content {
+      display: none;
+      position: absolute;
+      bottom: 20px;
+      right: 0;
+      width: 250px;
+      background: var(--panel-bg);
+      border: 1px solid var(--primary-cyan);
+      padding: 10px;
+      border-radius: 4px;
+      box-shadow: 0 0 10px var(--dim-cyan);
+      text-align: left;
+      backdrop-filter: blur(8px);
+    }
+
+    .cmd-widget:hover .cmd-widget-content {
+      display: block;
+    }
+
+    .cmd-widget-content ul {
+      list-style: none;
+      margin-top: 5px;
+    }
+
+    .cmd-widget-content li {
+      margin: 4px 0;
+      color: var(--text-main);
+      border-bottom: 1px dashed var(--dim-cyan);
+      padding-bottom: 2px;
+    }
   </style>
 </head>
 <body>
@@ -397,9 +469,12 @@
         <li style="opacity: 0.6;">Requiere sincronización</li>
       </ul>
 
-      <h4 style="margin-top: 20px; color: var(--primary-cyan);">ACCIONES RÁPIDAS</h4>
-      <button onclick="triggerJoke()" style="width: 100%; margin-top: 8px;">PROTOCOLO CHISTE</button>
-      <button onclick="triggerFact()" style="width: 100%; margin-top: 8px;">DATO CURIOSO</button>
+      <!-- Oculto por defecto; activable con comandos -->
+      <div id="section-quick-actions" class="hidden" style="margin-top: 20px;">
+        <h4 style="color: var(--primary-cyan);">ACCIONES RÁPIDAS</h4>
+        <button onclick="triggerJoke()" style="width: 100%; margin-top: 8px;">PROTOCOLO CHISTE</button>
+        <button onclick="triggerFact()" style="width: 100%; margin-top: 8px;">DATO CURIOSO</button>
+      </div>
     </section>
 
     <!-- Panel Central: Reactor + Consola Core -->
@@ -424,8 +499,8 @@
       </div>
     </section>
 
-    <!-- Panel Derecho: Modos de Estudio -->
-    <section class="hud-card">
+    <!-- Panel Derecho: Modos de Estudio (Oculto por defecto) -->
+    <section class="hud-card hidden" id="section-learning-core">
       <h3>// NÚCLEO APRENDIZAJE</h3>
       <div class="mode-selector" style="margin-top: 10px;">
         <button class="mode-tab" onclick="switchMode('flashcards')">FLASHCARDS</button>
@@ -470,6 +545,19 @@
       </div>
     </section>
   </main>
+
+  <!-- Widget discreto: Comandos Avanzados -->
+  <div class="cmd-widget">
+    <span>[Comandos avanzados]</span>
+    <div class="cmd-widget-content">
+      <strong style="color: var(--primary-cyan);">COMANDOS DE VOZ Y TEXTO:</strong>
+      <ul>
+        <li>• "Activa el núcleo de aprendizaje"</li>
+        <li>• "Activa acciones rápidas"</li>
+        <li>• "Quiero agendar [evento] el [fecha] a las [hora]"</li>
+      </ul>
+    </div>
+  </div>
 
   <script>
     /* ==========================================================================
@@ -673,6 +761,25 @@
       const isUser = sender.toLowerCase() === 'tú' || sender.toLowerCase() === 'usuario';
       msgDiv.className = `chat-msg ${isUser ? 'user' : 'aria'}`;
       msgDiv.innerHTML = `<strong>[${sender}]:</strong> ${text}`;
+
+      // Botón para copiar respuesta de ARIA
+      if (!isUser) {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.innerText = '📋';
+        copyBtn.title = 'Copiar al portapapeles';
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.innerText = '✅';
+            setTimeout(() => {
+              copyBtn.innerText = '📋';
+            }, 1500);
+          }).catch(err => {
+            console.error('Error al copiar:', err);
+          });
+        };
+        msgDiv.appendChild(copyBtn);
+      }
       
       history.appendChild(msgDiv);
       history.scrollTop = history.scrollHeight;
@@ -702,6 +809,110 @@
 
     async function processCommand(query) {
       const lower = query.toLowerCase();
+
+      // Detección local 1: Núcleo de aprendizaje
+      if (lower.includes("activa el núcleo de aprendizaje") || lower.includes("núcleo de aprendizaje") || lower.includes("nucleo de aprendizaje")) {
+        document.getElementById('section-learning-core').classList.remove('hidden');
+        const reply = "Núcleo de aprendizaje activado. ¿Flashcards, quiz o resumen?";
+        addChatMessage(ASSISTANT_NAME, reply);
+        speakText(reply);
+        return;
+      }
+
+      // Detección local 2: Acciones rápidas
+      if (lower.includes("activa acciones rápidas") || lower.includes("acciones rápidas") || lower.includes("acciones rapidas")) {
+        document.getElementById('section-quick-actions').classList.remove('hidden');
+        const reply = "Acciones rápidas activadas. ¿Chiste o dato curioso?";
+        addChatMessage(ASSISTANT_NAME, reply);
+        speakText(reply);
+        return;
+      }
+
+      // Detección local 3: Agendar en Google Calendar
+      if (lower.includes("quiero agendar") || lower.includes("agéndame") || lower.includes("agendame") || lower.includes("agenda")) {
+        if (!googleAccessToken) {
+          const msg = "Para agendar eventos en su calendario, primero debe conectar su cuenta de Google desde el panel lateral.";
+          addChatMessage(ASSISTANT_NAME, msg);
+          speakText(msg);
+          return;
+        }
+
+        document.getElementById('arc-reactor').classList.add('listening');
+
+        const now = new Date();
+        const dateRef = now.toISOString().split('T')[0];
+        const calendarPrompt = `Extrae los detalles del evento del siguiente texto del usuario: "${query}".
+Hoy es ${dateRef} (${now.toLocaleDateString('es-ES', { weekday: 'long' })}).
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni bloques de formato Markdown, con la siguiente estructura:
+{"titulo": "string", "fecha": "YYYY-MM-DD", "hora": "HH:MM", "duracion_minutos": number}
+Si el usuario no especifica duración, usa 60 minutos por defecto. Asume el año actual si no se especifica.`;
+
+        try {
+          const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': GEMINI_API_KEY 
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: query }] }],
+              systemInstruction: { parts: [{ text: calendarPrompt }] }
+            })
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error?.message || "Error consultando la API");
+
+          const rawText = data.candidates[0].content.parts[0].text.trim();
+          // Limpiar envoltorios markdown si la IA de todos modos los pone
+          const jsonString = rawText.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+          
+          let parsed;
+          try {
+            parsed = JSON.parse(jsonString);
+          } catch (e) {
+            throw new Error("No pude interpretar la fecha, hora o título exactos. Por favor, especifíquelos de manera más clara.");
+          }
+
+          if (!parsed.titulo || !parsed.fecha || !parsed.hora) {
+            throw new Error("Faltan parámetros clave para agendar el evento.");
+          }
+
+          // Crear fecha de inicio y fin ISO
+          const startDateTime = new Date(`${parsed.fecha}T${parsed.hora}:00`);
+          const endDateTime = new Date(startDateTime.getTime() + (parsed.duracion_minutos || 60) * 60000);
+          const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+          const calRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${googleAccessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              summary: parsed.titulo,
+              start: { dateTime: startDateTime.toISOString(), timeZone: timeZone },
+              end: { dateTime: endDateTime.toISOString(), timeZone: timeZone }
+            })
+          });
+
+          if (!calRes.ok) throw new Error("Error al comunicarse con la API de Google Calendar.");
+
+          const confirmMsg = `Evento agendado: ${parsed.titulo} el ${parsed.fecha} a las ${parsed.hora}.`;
+          addChatMessage(ASSISTANT_NAME, confirmMsg);
+          speakText(confirmMsg);
+          fetchCalendarEvents(googleAccessToken);
+
+        } catch (error) {
+          console.error("Error al agendar evento:", error);
+          const errReply = error.message.includes("interpretar") ? error.message : "No fue posible agendar el evento. Por favor intente especificando el título, la fecha y la hora claramente.";
+          addChatMessage(ASSISTANT_NAME, errReply);
+          speakText(errReply);
+        } finally {
+          document.getElementById('arc-reactor').classList.remove('listening');
+        }
+        return;
+      }
 
       if (lower.includes("chiste") || lower.includes("gracioso")) {
         triggerJoke();
@@ -971,9 +1182,11 @@
     function initGoogleClient() {
       if (typeof google === 'undefined') return;
 
+      /* NOTA: Se actualizó el scope de Google Calendar a 'https://www.googleapis.com/auth/calendar' (escritura)
+         para permitir la creación de eventos nuevos. El usuario debe iniciar sesión nuevamente para autorizar los permisos. */
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.readonly',
+        scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.readonly',
         callback: async (tokenResponse) => {
           if (tokenResponse.access_token) {
             googleAccessToken = tokenResponse.access_token;
